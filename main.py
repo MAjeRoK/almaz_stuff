@@ -11,6 +11,8 @@ import time
 #                      Размер сектора действия]
 # source_direction = [Направление луча Альфа,
 #                     Направление луча Бета]
+# Функция перебирает все цели в воздухе и проверяет каждую, что попадает ли она в луч
+# с помощью обычной теоремы косинусов
 def detection(dots, source_properties, source_direction):
     # Количество целей в секторе
     num = 0
@@ -31,6 +33,8 @@ def detection(dots, source_properties, source_direction):
 
 
 # Анализ всего пространства
+# Эта функция перебирала всё пространство ваозможных позиций луча
+# На данный момент данная функция не используется в программе, т.к. требует много времени исполнения
 def analysis(dots, source_properties, freq):
     summaries = np.zeros((freq, freq))
     for alfa in range(freq):
@@ -41,8 +45,10 @@ def analysis(dots, source_properties, freq):
 
 
 # Анализ пространства по областям вокруг целей
+# Эта функция является альтернативой предыдущей, она перебирает пространство, но только вокруг каждой из целей.
 def analysis_areas(dots, source_properties, freq):
     summaries = np.zeros((freq, freq))
+    # Следующей строкой я задаю обход пространства вокруг цели по четвертям и уже в получившемся секторе прогоняю функцию detection
     iteration = [[1, 1], [1, -1], [-1, -1], [-1, 1]]
     maximum = 0
     alfa_max = 0
@@ -91,7 +97,7 @@ def spherical(xyz, ray_position):
         return [a, b]
 
 
-# Проверка нахождения точки в секторе
+# Проверка нахождения точки в секторе с помощью теоремы косинусов
 def check(dot, source_properties, source_direction):
     # Треугольник ABC
     x = dot[0] - source_properties[0]
@@ -109,6 +115,8 @@ def check(dot, source_properties, source_direction):
 
 
 # Функция воздействия целями
+# Эта функция уменьшает жизни целям, и проверяет являются ли они уничтоженными
+# Тут переменная armor означает число "здоровья" у бомб в начале
 def impact(dots, source_properties, source_direction, armor):
     # Количество целей в секторе
     output = []
@@ -121,9 +129,11 @@ def impact(dots, source_properties, source_direction, armor):
 
 
 result = open('big_result.txt', 'w')
-for x in range(0, 20):
-    for y in range(0, 20):
-        print('Позиция расчета:', x, y)
+#Тут вложены циклы, которые перебирали всю пространство на плоскости, на которое можно было поместить Источник излучения
+#Я укажу, чтобы рассчёт производился только раз
+for x in range(1):        #Предыдущая запись: for x in range(0, 20):
+    for y in range(1):    #Предыдущая запись: for y in range(0, 20):
+        # print('Позиция расчета:', x, y)
         result_txt = ''
         for set_data in range(20):
             start_time = time.time()
@@ -138,14 +148,15 @@ for x in range(0, 20):
             bombs = open(f'bombs/set_{set_data}.txt', 'r')
 
             freq_time = 3
-            fall_speed = 15.0 / freq_time  # Скорость падения
-            frequency = 180
+            fall_speed = 15.0 / freq_time  # Скорость падения на один тик рассчёта равный freq_time
+            frequency = 180 # Частота дискретизации пространства сферических координат верхней полусферы.
             life = 3 * freq_time
-            ray_prop = [x * 100, y * 100, 2000, 15 * np.pi / 180]  # Характеристики луча
-
+            # ray_prop = [x * 100, y * 100, 2000, 15 * np.pi / 180]  # Характеристики луча при переборе
+            # ray_prop = [250, 250, 2000, 15 * np.pi / 180]  # Характеристики луча конкретно задаваемые
+            # Характеристиками луча являются положения по OX и OY, дальность луча и размер сектора луча(угловой радиус, не диаметр)
             i = 0
             while 1:
-                inpt = list(map(float, bombs.readline().split()))
+                inpt = list(map(float, bombs.readline().split())) # Производится считывание файла с положениями бомб в 0-ую секунду
                 if inpt == []:
                     break
                 data.append([1, 0, i, float(inpt[0]), float(inpt[1]), float(inpt[2])-500, 0])
@@ -160,7 +171,8 @@ for x in range(0, 20):
 
             data_sums, best_angles = analysis_areas(test_date[:, 3:6], ray_prop, frequency)
 
-            #  print(best_angles)
+            #  print(best_angles) Если вывести эту строку то с частотой дискретизации времени 1/freq_time будет выводиться направление Луча,
+            #  которое является оптимальным
             plt.imshow(data_sums, extent=[-90, 90, 90, -90])
             plt.colorbar()
             plt.scatter(test_data_spherical[:, 1] * 180 / np.pi, test_data_spherical[:, 0] * 180 / np.pi, color='r')
@@ -168,6 +180,8 @@ for x in range(0, 20):
 
             flag = 0
             data_calculate = impact(test_date[:, 3:7], ray_prop, best_angles, life)
+            # Следующий цикл производит симуляцию до момента достижения целями 100 метровой высоты.
+            # Значение 500 означает что бомбы будут снижаться с 600 метров до 600-500=100 метрам
             for i in range(int(500 / fall_speed)):
                 data_calculate[:, 2] -= fall_speed
                 # print(data_calculate)
@@ -187,6 +201,7 @@ for x in range(0, 20):
                     plt.show()
 
                 # print(best_angles)
+                # Тут производится запись результата измерений с данным набором
                 data_calculate = impact(data_calculate, ray_prop, best_angles, life)
                 if len(data_calculate) == 0:
                     sum_data = np.round((i+2)/freq_time, 1)
